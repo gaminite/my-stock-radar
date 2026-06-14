@@ -1,0 +1,8 @@
+streamlit
+yfinance
+pandas
+requests
+urllib3
+openpyxl
+gspread
+oauth2client
