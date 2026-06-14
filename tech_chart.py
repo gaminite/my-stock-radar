@@ -1,4 +1,25 @@
 import streamlit as st
+
+# 1. 定義家族密碼
+FAMILY_PASSWORD = "26283188" # 您可以自己改成喜歡的數字或英文
+
+# 2. 建立密碼檢查機制
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.markdown("### 🔒 家族專屬戰情室")
+    pwd_input = st.text_input("請輸入通關密碼：", type="password")
+    if st.button("解鎖進入"):
+        if pwd_input == FAMILY_PASSWORD:
+            st.session_state.authenticated = True
+            st.rerun() # 密碼正確，重新載入畫面
+        else:
+            st.error("❌ 密碼錯誤，請重新輸入！")
+    st.stop() # 密碼如果沒過，程式就在這裡停止，不執行下方的看盤畫布
+
+
+import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
