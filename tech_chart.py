@@ -1,4 +1,13 @@
 import streamlit as st
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import time
+import requests
+import json
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 1. 定義家族密碼
 FAMILY_PASSWORD = "26283188" # 您可以自己改成喜歡的數字或英文
@@ -18,17 +27,6 @@ if not st.session_state.authenticated:
             st.error("❌ 密碼錯誤，請重新輸入！")
     st.stop() # 密碼如果沒過，程式就在這裡停止，不執行下方的看盤畫布
 
-
-import streamlit as st
-import yfinance as yf
-import pandas as pd
-import numpy as np
-import time
-import requests
-import json
-import urllib3
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # ==========================================
 # --- 網頁基礎設定 ---
@@ -230,12 +228,12 @@ def scan_stocks(ticker_list):
         status_text.text(f"正在掃描: {ticker} ({i+1}/{total})")
         try:
             if ticker.isdigit() and len(ticker) == 4:
-                stock_data = yf.Ticker(f"{ticker}.TW").history(period="1y")
+                stock_data = yf.Ticker(f"{ticker}.TW").history(period="3y")
                 if stock_data.empty:
                     ticker = f"{ticker}.TWO"
-                    stock_data = yf.Ticker(ticker).history(period="1y")
+                    stock_data = yf.Ticker(ticker).history(period="3y")
                 else: ticker = f"{ticker}.TW"
-            else: stock_data = yf.Ticker(ticker).history(period="1y")
+            else: stock_data = yf.Ticker(ticker).history(period="3y")
                 
             if not stock_data.empty:
                 df = calculate_indicators(stock_data)
@@ -263,7 +261,7 @@ def scan_stocks(ticker_list):
 def render_javascript_canvas(ticker_symbol, k_type, show_st, show_resonance, show_pd, show_ob_current, show_ob_higher):
     ticker = yf.Ticker(ticker_symbol)
     period_map = {"日K": "1y", "周K": "3y", "月K": "7y"}
-    raw_data = ticker.history(period=period_map.get(k_type, "1y"))
+    raw_data = ticker.history(period=period_map.get(k_type, "3y"))
     
     if k_type == "周K":
         raw_data = raw_data.resample('W').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
@@ -275,6 +273,19 @@ def render_javascript_canvas(ticker_symbol, k_type, show_st, show_resonance, sho
         return
 
     df = calculate_indicators(raw_data)
+
+    # ✨ ========================================================
+    # ✨ 核心戰術主控台：安裝 SuperTrend 守備位與 7 燈指標儀表板
+    # ✨ ========================================================
+    latest_row = df.iloc[-1]
+    st.markdown(f"### 🛠️ {ticker_symbol} 核心戰術主控台 ({k_type}視窗)")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("當前收盤價", f"{latest_row['Real_Close']:.2f} 元")
+    m2.metric("SuperTrend 守備位", f"{latest_row['SuperTrend']:.2f} 元")
+    m3.metric("技術面總體評分", f"{int(latest_row['Score'])}/7 燈")
+    m4.metric("歷史資料截取日", df.index[-1].strftime('%Y-%m-%d'))
+    st.markdown("<br>", unsafe_allow_html=True)
+    # ===========================================================
     
     # 計算機構訂單塊 (OB)
     # 當前週期：回看 6 根 K 線尋找波段
@@ -295,6 +306,7 @@ def render_javascript_canvas(ticker_symbol, k_type, show_st, show_resonance, sho
             "rl": float(row['Real_Low']), "rc": float(row['Real_Close']),
             "sma20": float(row['SMA_20']) if row['SMA_20'] else None,
             "sma60": float(row['SMA_60']) if row['SMA_60'] else None,
+            "st_val": float(row['SuperTrend']), # 傳遞給浮動標籤用
             "st_up": float(row['SuperTrend']) if row['SuperTrend_Dir'] == 1 else None,
             "st_down": float(row['SuperTrend']) if row['SuperTrend_Dir'] == -1 else None,
             "resonance": bool(row['First_Resonance']),
@@ -671,8 +683,9 @@ def render_javascript_canvas(ticker_symbol, k_type, show_st, show_resonance, sho
                         <b>🗓️ 日期: ${{data[idx].date}}</b><br>
                         開盤: ${{data[idx].ro.toFixed(2)}} | 最高: ${{data[idx].rh.toFixed(2)}}<br>
                         最低: ${{data[idx].rl.toFixed(2)}} | <b>收盤: ${{data[idx].rc.toFixed(2)}}</b><br>
-                        <span style="color:#2962ff">SMA20: ${{data[idx].sma20 ? data[idx].sma20.toFixed(2) : '-'}}</span><br>
-                        <span style="color:#9c27b0">SMA60: ${{data[idx].sma60 ? data[idx].sma60.toFixed(2) : '-'}}</span>
+                        <span style="color:#2962ff">SMA20: ${{data[idx].sma20 ? data[idx].sma20.toFixed(2) : '-'}}</span> |
+                        <span style="color:#9c27b0">SMA60: ${{data[idx].sma60 ? data[idx].sma60.toFixed(2) : '-'}}</span><br>
+                        <span style="color:#ff9800; font-weight:bold;">🛡️ ST守備位: ${{data[idx].st_val ? data[idx].st_val.toFixed(2) : '-'}}</span>
                     `;
                 }}
 
